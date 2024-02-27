@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-var connectionString string = ""
+var connectionString string = "mongodb://localhost:27017"
 var dbname string = "graphql-job-board"
 
 type DB struct {
@@ -83,19 +83,55 @@ func (db *DB) CreateJobListing(jobInfo model.CreateJobListingInput) *model.JobLi
 		log.Fatal(err)
 	}
 	insertedID := inserted.InsertedID.(primitive.ObjectID).Hex()
-	returnJobListing := model.JobListing{ID: insertedID,
+	log.Printf("%v",insertedID)
+	returnJobListing := model.JobListing{
+		ID: insertedID,
 		Title:       jobInfo.Title,
-		Description: jobInfo.Company,
+		Description: jobInfo.Description,
 		Company:     jobInfo.Company,
 		URL:         jobInfo.URL}
 	return &returnJobListing
 }
 
 func (db *DB) UpdateJobListing(jobId string, jobInfo model.UpdateJobListingInput) *model.JobListing {
+	jobCollection := db.client.Database(dbname).Collection("jobs")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	updateJobInfo:= bson.M{}
+	if jobInfo.Title !=nil{
+		updateJobInfo["title"] = jobInfo.Title
+	}
+	if jobInfo.Description !=nil{
+		updateJobInfo["description"] = jobInfo.Description
+	}
+	if jobInfo.URL !=nil{
+		updateJobInfo["url"] = jobInfo.URL
+	}
+	_id, _:= primitive.ObjectIDFromHex(jobId)
+	filter := bson.M{"_id":_id}
+	update := bson.M{"$set": updateJobInfo}
+
+	result:= jobCollection.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(1))
+	
 	var jobListing model.JobListing
+	if err:= result.Decode(&jobCollection); err!=nil{
+		log.Fatal(err)
+	}
+	
 	return &jobListing
 }
 
 func (db *DB) DeleteJobListing(jobId string) *model.DeleteJobResponse {
+	jobCollection := db.client.Database(dbname).Collection("jobs")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	_id, _:= primitive.ObjectIDFromHex(jobId)
+	filter := bson.M{"_id":_id}
+	_, err:= jobCollection.DeleteOne(ctx, filter)
+	if err!=nil {
+		log.Fatal(err)
+	}
 	return &model.DeleteJobResponse{DeleteJobID: jobId}
 }

@@ -9,3 +9,7 @@ update code in schema.resolvers.go
 
  most already built application arent expecting graphql
  there are no tests or validations in this project
+
+
+ how will cleints access it
+ get job and get jobs do not return ID field
